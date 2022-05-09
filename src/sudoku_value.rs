@@ -1,6 +1,15 @@
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SudokuValue {
-    Empty, One, Two, Three, Four, Five, Six, Seven, Eight, Nine
+    Empty,
+    One,
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
 }
 
 impl SudokuValue {
@@ -15,11 +24,24 @@ impl SudokuValue {
             '7' => SudokuValue::Seven,
             '8' => SudokuValue::Eight,
             '9' => SudokuValue::Nine,
-            _=> SudokuValue::Empty,
+            _ => SudokuValue::Empty,
         }
     }
-}
 
+    pub fn all_values() -> [SudokuValue; 9] {
+        return [
+            SudokuValue::One,
+            SudokuValue::Two,
+            SudokuValue::Three,
+            SudokuValue::Four,
+            SudokuValue::Five,
+            SudokuValue::Six,
+            SudokuValue::Seven,
+            SudokuValue::Eight,
+            SudokuValue::Nine,
+        ];
+    }
+}
 
 impl std::fmt::Display for SudokuValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
