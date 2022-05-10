@@ -1,5 +1,6 @@
 use crate::point::Point;
 use crate::sudoku_value::SudokuValue;
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct SudokuError();
@@ -44,7 +45,10 @@ impl SudokuState {
     fn split_solutions(&self) -> Result<Vec<SudokuState>, SudokuError> {
         let point_to_split = self.find_best_split_point();
         let mut ret = vec![];
-        for value in self.find_values_at_point(&point_to_split).into_iter() {
+        for value in self
+            .find_allowed_values_at_point(&point_to_split)
+            .into_iter()
+        {
             let mut clone = self.clone();
             clone.set(&point_to_split, value);
             if let Ok(solutions) = clone.solve() {
@@ -64,7 +68,8 @@ impl SudokuState {
                 if self.get(&p1) != SudokuValue::Empty {
                     p2
                 } else if self.get(&p2) != SudokuValue::Empty
-                    || self.find_values_at_point(&p1).len() < self.find_values_at_point(&p2).len()
+                    || self.find_allowed_values_at_point(&p1).len()
+                        < self.find_allowed_values_at_point(&p2).len()
                 {
                     p1
                 } else {
@@ -118,10 +123,10 @@ impl SudokuState {
         // fits the rules. e.g. if 3 points can be 1 8 9; 8 9; and 8 9; respectively, then even
         // though the "simple reduce" gives us 1 8 9, we want to be able to discern that 1 can only
         // be assigned to that point.
-        let values_found_at_points: [Vec<SudokuValue>; 9] = points
+        let values_found_at_points: [HashSet<SudokuValue>; 9] = points
             .into_iter()
-            .map(|p| self.find_values_at_point(&p))
-            .collect::<Vec<Vec<SudokuValue>>>()
+            .map(|p| self.find_allowed_values_at_point(&p))
+            .collect::<Vec<HashSet<SudokuValue>>>()
             .try_into()
             .unwrap();
         for value in SudokuValue::all_values().into_iter() {
@@ -136,7 +141,7 @@ impl SudokuState {
     fn get_points_that_can_be_value(
         &self,
         points: &[Point; 9],
-        values_found_at_points: &[Vec<SudokuValue>; 9],
+        values_found_at_points: &[HashSet<SudokuValue>; 9],
         value: SudokuValue,
     ) -> Vec<Point> {
         (0..9)
@@ -147,9 +152,9 @@ impl SudokuState {
 
     fn reduce_at_point(&mut self, point: &Point) -> Result<(), SudokuError> {
         if self.get(point) == SudokuValue::Empty {
-            let values = self.find_values_at_point(point);
+            let values = self.find_allowed_values_at_point(point);
             if values.len() == 1 {
-                self.set(point, values[0]);
+                self.set(point, values.into_iter().next().unwrap());
             } else if values.is_empty() {
                 return Err(SudokuError());
             }
@@ -157,47 +162,44 @@ impl SudokuState {
         Ok(())
     }
 
-    fn find_values_at_point(&self, point: &Point) -> Vec<SudokuValue> {
+    fn find_allowed_values_at_point(&self, point: &Point) -> HashSet<SudokuValue> {
         if self.get(point) != SudokuValue::Empty {
-            return vec![];
+            return HashSet::new();
         }
         let horizontal = self.find_horizontal_matching_point(point);
         let vertical = self.find_vertical_matching_point(point);
         let block = self.find_block_matching_point(point);
-        let mut ret: Vec<SudokuValue> = vec![];
-        for value in SudokuValue::all_values().iter() {
-            if !(horizontal.contains(value) | vertical.contains(value) | block.contains(value)) {
-                ret.push(*value)
-            }
-        }
-        ret
+        let ret: HashSet<SudokuValue> = HashSet::from(SudokuValue::all_values());
+        ret.difference(&horizontal)
+            .cloned()
+            .collect::<HashSet<SudokuValue>>()
+            .difference(&vertical)
+            .cloned()
+            .collect::<HashSet<SudokuValue>>()
+            .difference(&block)
+            .cloned()
+            .collect::<HashSet<SudokuValue>>()
     }
 
-    fn find_horizontal_matching_point(&self, point: &Point) -> [SudokuValue; 9] {
-        point
-            .get_horizontal_matching()
+    fn get_values_at_points(
+        &self,
+        points: Box<dyn Iterator<Item = Point> + '_>,
+    ) -> HashSet<SudokuValue> {
+        points
             .map(|p| self.get(&p))
-            .collect::<Vec<SudokuValue>>()
-            .try_into()
-            .unwrap()
+            .collect::<HashSet<SudokuValue>>()
     }
 
-    fn find_vertical_matching_point(&self, point: &Point) -> [SudokuValue; 9] {
-        point
-            .get_vertical_matching()
-            .map(|p| self.get(&p))
-            .collect::<Vec<SudokuValue>>()
-            .try_into()
-            .unwrap()
+    fn find_horizontal_matching_point(&self, point: &Point) -> HashSet<SudokuValue> {
+        self.get_values_at_points(point.get_horizontal_matching())
     }
 
-    fn find_block_matching_point(&self, point: &Point) -> [SudokuValue; 9] {
-        point
-            .get_block_matching()
-            .map(|p| self.get(&p))
-            .collect::<Vec<SudokuValue>>()
-            .try_into()
-            .unwrap()
+    fn find_vertical_matching_point(&self, point: &Point) -> HashSet<SudokuValue> {
+        self.get_values_at_points(point.get_vertical_matching())
+    }
+
+    fn find_block_matching_point(&self, point: &Point) -> HashSet<SudokuValue> {
+        self.get_values_at_points(point.get_block_matching())
     }
 
     fn get(&self, point: &Point) -> SudokuValue {
@@ -221,14 +223,15 @@ mod test {
     use crate::sudoku_state::SudokuError;
     use crate::sudoku_value::SudokuValue;
     use crate::SudokuState;
+    use std::collections::HashSet;
 
     #[test]
     fn test_find_values_at_point() {
         let input_str = include_str!("../test_data.txt");
         let state = SudokuState::new(input_str);
         assert_eq!(
-            state.find_values_at_point(&Point(2, 8)),
-            vec![SudokuValue::Four, SudokuValue::Six, SudokuValue::Nine]
+            state.find_allowed_values_at_point(&Point(2, 8)),
+            HashSet::from([SudokuValue::Four, SudokuValue::Six, SudokuValue::Nine])
         );
     }
 

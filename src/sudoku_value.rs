@@ -1,4 +1,4 @@
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
 pub enum SudokuValue {
     Empty,
     One,
@@ -29,7 +29,7 @@ impl SudokuValue {
     }
 
     pub fn all_values() -> [SudokuValue; 9] {
-        return [
+        [
             SudokuValue::One,
             SudokuValue::Two,
             SudokuValue::Three,
@@ -39,7 +39,7 @@ impl SudokuValue {
             SudokuValue::Seven,
             SudokuValue::Eight,
             SudokuValue::Nine,
-        ];
+        ]
     }
 }
 
