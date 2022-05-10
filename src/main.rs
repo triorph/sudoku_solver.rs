@@ -9,7 +9,10 @@ fn main() -> Result<(), SudokuError> {
         .expect("Need input data to be in correct format");
     let initial = SudokuState::new(&input_str);
     println!("Initial sudoku state: \n{}", initial);
-    let solution = initial.solve()?;
-    println!("Final sudoku state: \n{}", solution[0]);
+    let solutions = initial.solve()?;
+    println!("Found {} solution(s)\n", solutions.len());
+    for (i, solution) in solutions.iter().enumerate() {
+        println!("Solution {}: \n{}", i + 1, solution);
+    }
     Ok(())
 }
