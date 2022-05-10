@@ -1,4 +1,4 @@
-use crate::point::Point;
+use crate::point::SudokuPoint;
 use crate::sudoku_value::SudokuValue;
 use std::collections::HashSet;
 
@@ -62,8 +62,8 @@ impl SudokuState {
         }
     }
 
-    fn find_best_split_point(&self) -> Point {
-        Point::all_points()
+    fn find_best_split_point(&self) -> SudokuPoint {
+        SudokuPoint::all_points()
             .reduce(|p1, p2| {
                 if self.get(&p1) != SudokuValue::Empty {
                     p2
@@ -91,7 +91,7 @@ impl SudokuState {
     }
 
     fn reduce_once(&mut self) -> Result<(), SudokuError> {
-        for point in Point::all_points() {
+        for point in SudokuPoint::all_points() {
             self.reduce_at_point(&point)?
         }
         self.reduce_horizontal_lines();
@@ -101,24 +101,24 @@ impl SudokuState {
     }
 
     fn reduce_horizontal_lines(&mut self) {
-        for line in Point::get_horizontal_lines() {
+        for line in SudokuPoint::get_horizontal_lines() {
             self.reduce_ruled_points(line)
         }
     }
 
     fn reduce_vertical_lines(&mut self) {
-        for line in Point::get_vertical_lines() {
+        for line in SudokuPoint::get_vertical_lines() {
             self.reduce_ruled_points(line)
         }
     }
 
     fn reduce_blocks(&mut self) {
-        for block in Point::get_blocks() {
+        for block in SudokuPoint::get_blocks() {
             self.reduce_ruled_points(block)
         }
     }
 
-    fn reduce_ruled_points(&mut self, points: [Point; 9]) {
+    fn reduce_ruled_points(&mut self, points: [SudokuPoint; 9]) {
         // The idea of this method is to find a location where in this set of points, only 1 number
         // fits the rules. e.g. if 3 points can be 1 8 9; 8 9; and 8 9; respectively, then even
         // though the "simple reduce" gives us 1 8 9, we want to be able to discern that 1 can only
@@ -140,17 +140,17 @@ impl SudokuState {
 
     fn get_points_that_can_be_value(
         &self,
-        points: &[Point; 9],
+        points: &[SudokuPoint; 9],
         values_found_at_points: &[HashSet<SudokuValue>; 9],
         value: SudokuValue,
-    ) -> Vec<Point> {
+    ) -> Vec<SudokuPoint> {
         (0..9)
             .filter(|i| values_found_at_points[*i].contains(&value))
             .map(|i| points[i])
             .collect()
     }
 
-    fn reduce_at_point(&mut self, point: &Point) -> Result<(), SudokuError> {
+    fn reduce_at_point(&mut self, point: &SudokuPoint) -> Result<(), SudokuError> {
         if self.get(point) == SudokuValue::Empty {
             let values = self.find_allowed_values_at_point(point);
             if values.len() == 1 {
@@ -162,7 +162,7 @@ impl SudokuState {
         Ok(())
     }
 
-    fn find_allowed_values_at_point(&self, point: &Point) -> HashSet<SudokuValue> {
+    fn find_allowed_values_at_point(&self, point: &SudokuPoint) -> HashSet<SudokuValue> {
         if self.get(point) != SudokuValue::Empty {
             return HashSet::new();
         }
@@ -183,35 +183,35 @@ impl SudokuState {
 
     fn get_values_at_points(
         &self,
-        points: Box<dyn Iterator<Item = Point> + '_>,
+        points: Box<dyn Iterator<Item = SudokuPoint> + '_>,
     ) -> HashSet<SudokuValue> {
         points
             .map(|p| self.get(&p))
             .collect::<HashSet<SudokuValue>>()
     }
 
-    fn find_horizontal_matching_point(&self, point: &Point) -> HashSet<SudokuValue> {
+    fn find_horizontal_matching_point(&self, point: &SudokuPoint) -> HashSet<SudokuValue> {
         self.get_values_at_points(point.get_horizontal_matching())
     }
 
-    fn find_vertical_matching_point(&self, point: &Point) -> HashSet<SudokuValue> {
+    fn find_vertical_matching_point(&self, point: &SudokuPoint) -> HashSet<SudokuValue> {
         self.get_values_at_points(point.get_vertical_matching())
     }
 
-    fn find_block_matching_point(&self, point: &Point) -> HashSet<SudokuValue> {
+    fn find_block_matching_point(&self, point: &SudokuPoint) -> HashSet<SudokuValue> {
         self.get_values_at_points(point.get_block_matching())
     }
 
-    fn get(&self, point: &Point) -> SudokuValue {
+    fn get(&self, point: &SudokuPoint) -> SudokuValue {
         self.values[point.1 as usize][point.0 as usize]
     }
 
-    fn set(&mut self, point: &Point, value: SudokuValue) {
+    fn set(&mut self, point: &SudokuPoint, value: SudokuValue) {
         self.values[point.1 as usize][point.0 as usize] = value;
     }
 
     fn empty_count(&self) -> usize {
-        Point::all_points()
+        SudokuPoint::all_points()
             .filter(|p| self.get(p) == SudokuValue::Empty)
             .count()
     }
@@ -219,7 +219,7 @@ impl SudokuState {
 
 #[cfg(test)]
 mod test {
-    use crate::point::Point;
+    use crate::point::SudokuPoint;
     use crate::sudoku_state::SudokuError;
     use crate::sudoku_value::SudokuValue;
     use crate::SudokuState;
@@ -230,7 +230,7 @@ mod test {
         let input_str = include_str!("../test_data.txt");
         let state = SudokuState::new(input_str);
         assert_eq!(
-            state.find_allowed_values_at_point(&Point(2, 8)),
+            state.find_allowed_values_at_point(&SudokuPoint(2, 8)),
             HashSet::from([SudokuValue::Four, SudokuValue::Six, SudokuValue::Nine])
         );
     }
@@ -239,8 +239,8 @@ mod test {
     fn test_reduce_at_point() -> Result<(), SudokuError> {
         let input_str = include_str!("../test_data.txt");
         let mut state = SudokuState::new(input_str);
-        state.reduce_at_point(&Point(4, 6))?;
-        assert_eq!(state.get(&Point(4, 6)), SudokuValue::Nine);
+        state.reduce_at_point(&SudokuPoint(4, 6))?;
+        assert_eq!(state.get(&SudokuPoint(4, 6)), SudokuValue::Nine);
         Ok(())
     }
 
@@ -249,7 +249,7 @@ mod test {
         let input_str = include_str!("../test_data.txt");
         let mut state = SudokuState::new(input_str);
         state.reduce_blocks();
-        assert_eq!(state.get(&Point(1, 7)), SudokuValue::One);
+        assert_eq!(state.get(&SudokuPoint(1, 7)), SudokuValue::One);
     }
 
     #[test]
