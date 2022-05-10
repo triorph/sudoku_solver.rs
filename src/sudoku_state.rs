@@ -31,10 +31,47 @@ impl std::fmt::Display for SudokuState {
 }
 
 impl SudokuState {
-    pub fn solve(&self) -> Result<SudokuState, SudokuError> {
+    pub fn solve(&self) -> Result<Vec<SudokuState>, SudokuError> {
         let mut solution = self.clone();
         solution.reduce_while_you_can()?;
-        Ok(solution)
+        if solution.empty_count() > 0 {
+            self.split_solutions()
+        } else {
+            Ok(vec![solution])
+        }
+    }
+
+    fn split_solutions(&self) -> Result<Vec<SudokuState>, SudokuError> {
+        let point_to_split = self.find_best_split_point();
+        let mut ret = vec![];
+        for value in self.find_values_at_point(&point_to_split).into_iter() {
+            let mut clone = self.clone();
+            clone.set(&point_to_split, value);
+            if let Ok(solutions) = clone.solve() {
+                ret.extend(solutions);
+            }
+        }
+        if !ret.is_empty() {
+            Ok(ret)
+        } else {
+            Err(SudokuError())
+        }
+    }
+
+    fn find_best_split_point(&self) -> Point {
+        Point::all_points()
+            .reduce(|p1, p2| {
+                if self.get(&p1) != SudokuValue::Empty {
+                    p2
+                } else if self.get(&p2) != SudokuValue::Empty
+                    || self.find_values_at_point(&p1).len() < self.find_values_at_point(&p2).len()
+                {
+                    p1
+                } else {
+                    p2
+                }
+            })
+            .unwrap()
     }
 
     fn reduce_while_you_can(&mut self) -> Result<(), SudokuError> {
@@ -213,12 +250,31 @@ mod test {
     }
 
     #[test]
+    fn test_unsolveable_gives_error() {
+        let mut input_str = String::new();
+        input_str += "1 2 3 4 5 6 7 8 _\n";
+        input_str += "_ _ _ _ _ _ _ _ 9\n";
+        input_str += "_ _ _ _ _ _ _ _ _\n";
+        input_str += "_ _ _ _ _ _ _ _ _\n";
+        input_str += "_ _ _ _ _ _ _ _ _\n";
+        input_str += "_ _ _ _ _ _ _ _ _\n";
+        input_str += "_ _ _ _ _ _ _ _ _\n";
+        input_str += "_ _ _ _ _ _ _ _ _\n";
+        input_str += "_ _ _ _ _ _ _ _ _\n";
+        let state = SudokuState::new(&input_str);
+        let solution = state.solve();
+        assert!(solution.is_err());
+    }
+
+    #[test]
     fn test_simple_solve() -> Result<(), SudokuError> {
         // A sudoku described as "simple" by the sudoku book I have.
         // Only requires the basic "reduce" strategy to solve.
         let input_str = include_str!("../test_data.txt");
         let state = SudokuState::new(input_str);
         let solution = state.solve()?;
+        assert_eq!(solution.len(), 1);
+        let solution = &solution[0];
         assert_eq!(solution.empty_count(), 0);
         let mut expected_solution = String::new();
         expected_solution += "+-------+-------+-------+\n";
@@ -245,6 +301,8 @@ mod test {
         let input_str = include_str!("../test_data_2.txt");
         let state = SudokuState::new(input_str);
         let solution = state.solve()?;
+        assert_eq!(solution.len(), 1);
+        let solution = &solution[0];
         assert_eq!(solution.empty_count(), 0);
         let mut expected_solution = String::new();
         expected_solution += "+-------+-------+-------+\n";

@@ -10,6 +10,6 @@ fn main() -> Result<(), SudokuError> {
     let initial = SudokuState::new(&input_str);
     println!("Initial sudoku state: \n{}", initial);
     let solution = initial.solve()?;
-    println!("Final sudoku state: \n{}", solution);
+    println!("Final sudoku state: \n{}", solution[0]);
     Ok(())
 }
