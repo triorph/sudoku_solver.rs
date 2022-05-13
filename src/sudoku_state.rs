@@ -1,6 +1,11 @@
 use crate::point::SudokuPoint;
 use crate::sudoku_value::SudokuValue;
 use std::collections::HashSet;
+use std::sync::mpsc;
+use std::thread;
+
+type SudokuSolutions = Result<Vec<SudokuState>, SudokuError>;
+type SudokuResult = Result<(), SudokuError>;
 
 #[derive(Debug)]
 pub struct SudokuError();
@@ -32,7 +37,7 @@ impl std::fmt::Display for SudokuState {
 }
 
 impl SudokuState {
-    pub fn solve(&self) -> Result<Vec<SudokuState>, SudokuError> {
+    pub fn solve(&self) -> SudokuSolutions {
         let mut solution = self.clone();
         solution.reduce_while_you_can()?;
         if solution.empty_count() > 0 {
@@ -42,18 +47,28 @@ impl SudokuState {
         }
     }
 
-    fn split_solutions(&self) -> Result<Vec<SudokuState>, SudokuError> {
+    fn split_solutions(&self) -> SudokuSolutions {
         let point_to_split = self.find_best_split_point();
-        let mut ret = vec![];
-        for value in self
-            .find_allowed_values_at_point(&point_to_split)
+        let (sender, receiver) = mpsc::channel();
+        let mut threads = Vec::new();
+        self.find_allowed_values_at_point(&point_to_split)
             .into_iter()
-        {
-            let mut clone = self.clone();
-            clone.set(&point_to_split, value);
-            if let Ok(solutions) = clone.solve() {
-                ret.extend(solutions);
-            }
+            .for_each(|value| {
+                let mut clone = self.clone();
+                clone.set(&point_to_split, value);
+                let sender = sender.clone();
+                threads.push(thread::spawn(move || {
+                    if let Ok(solutions) = clone.solve() {
+                        sender.send(solutions).unwrap();
+                    }
+                }))
+            });
+        for thread in threads.into_iter() {
+            thread.join().unwrap();
+        }
+        let mut ret = Vec::new();
+        while let Ok(solutions) = receiver.try_recv() {
+            ret.extend(solutions);
         }
         if !ret.is_empty() {
             Ok(ret)
@@ -79,7 +94,7 @@ impl SudokuState {
             .unwrap()
     }
 
-    fn reduce_while_you_can(&mut self) -> Result<(), SudokuError> {
+    fn reduce_while_you_can(&mut self) -> SudokuResult {
         loop {
             let start_count = self.empty_count();
             self.reduce_once()?;
@@ -90,7 +105,7 @@ impl SudokuState {
         Ok(())
     }
 
-    fn reduce_once(&mut self) -> Result<(), SudokuError> {
+    fn reduce_once(&mut self) -> SudokuResult {
         for point in SudokuPoint::all_points() {
             self.reduce_at_point(&point)?
         }
@@ -150,7 +165,7 @@ impl SudokuState {
             .collect()
     }
 
-    fn reduce_at_point(&mut self, point: &SudokuPoint) -> Result<(), SudokuError> {
+    fn reduce_at_point(&mut self, point: &SudokuPoint) -> SudokuResult {
         if self.get(point) == SudokuValue::Empty {
             let values = self.find_allowed_values_at_point(point);
             if values.len() == 1 {
@@ -220,7 +235,7 @@ impl SudokuState {
 #[cfg(test)]
 mod test {
     use crate::point::SudokuPoint;
-    use crate::sudoku_state::SudokuError;
+    use crate::sudoku_state::SudokuResult;
     use crate::sudoku_value::SudokuValue;
     use crate::SudokuState;
     use std::collections::HashSet;
@@ -236,7 +251,7 @@ mod test {
     }
 
     #[test]
-    fn test_reduce_at_point() -> Result<(), SudokuError> {
+    fn test_reduce_at_point() -> SudokuResult {
         let input_str = include_str!("../test_data.txt");
         let mut state = SudokuState::new(input_str);
         state.reduce_at_point(&SudokuPoint(4, 6))?;
@@ -270,7 +285,7 @@ mod test {
     }
 
     #[test]
-    fn test_simple_solve() -> Result<(), SudokuError> {
+    fn test_simple_solve() -> SudokuResult {
         // A sudoku described as "simple" by the sudoku book I have.
         // Only requires the basic "reduce" strategy to solve.
         let input_str = include_str!("../test_data.txt");
@@ -298,7 +313,7 @@ mod test {
     }
 
     #[test]
-    fn test_diabolical_solve() -> Result<(), SudokuError> {
+    fn test_diabolical_solve() -> SudokuResult {
         // A sudoku described as "diabolical" by thu sudoku book I have
         // Requires more than just reduce to solve
         let input_str = include_str!("../test_data_2.txt");

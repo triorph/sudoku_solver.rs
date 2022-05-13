@@ -33,10 +33,15 @@ Slightly more difficult:
   be assigned in one place (but it still has multiple other possibilities) then
   this is the actual place it must go.
 
+# What's done
+
+- Solve sudokus
+- Raise errors if the sudoku is unsolveable
+- Return multiple solutions if there are multiple solutions
+- Thread handling for the permutation checks
+
 # To do
 
 - I've done some minor optimisations, but I suspect the "rebuilding the reduce
   graph every time" could easily do with some caching.
-- I have still somehow avoided doing async stuff in rust, despite it supposed to
-  be giving you "Fearless concurrency". The splitting seems like a good place to
-  try that.
+- parameter based sudoku selection, instead of just always being input_data.txt
