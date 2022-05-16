@@ -37,13 +37,12 @@ impl std::fmt::Display for SudokuState {
 }
 
 impl SudokuState {
-    pub fn solve(&self) -> SudokuSolutions {
-        let mut solution = self.clone();
-        solution.reduce_while_you_can()?;
-        if solution.empty_count() > 0 {
+    pub fn solve(mut self) -> SudokuSolutions {
+        self.reduce_while_you_can()?;
+        if self.empty_count() > 0 {
             self.split_solutions()
         } else {
-            Ok(vec![solution])
+            Ok(vec![self])
         }
     }
 
